@@ -9,7 +9,7 @@
   /* System Base Tokens */
   --stat-fill: #b39cd0;
   --upvote: #2e7d32;
-  --downvote: #c62828;
+  --downvote: hsl(0, 66%, 47%);
 }
 
 @media (prefers-color-scheme: dark) {
