@@ -19,4 +19,4 @@ yarn-debug.log*
 
 # IDE & Editor Settings
 .vscode/
-.idea/
+.idea/node_modules/
