@@ -1,0 +1,27 @@
+:root {
+  /* Core Brand & Surface Tokens */
+  --bg-color: #f4f7f6;
+  --card-bg: #ffffff;
+  --text-main: #2b2b2b;
+  --primary: #8cd8d4;
+  --secondary: #cbc2d5;
+
+  /* System Base Tokens */
+  --stat-fill: #b39cd0;
+  --upvote: #2e7d32;
+  --downvote: #c62828;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-color: #1a1a1a;
+    --card-bg: #242424;
+    --text-main: #f0f0f0;
+    --primary: #8cd8d4;
+    --secondary: #b39cd0;
+
+    --stat-fill: #b39cd0;
+    --upvote: #81c784;
+    --downvote: #e57373;
+  }
+}

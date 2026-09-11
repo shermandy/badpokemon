@@ -1,0 +1,42 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
+}
+
+.container {
+  background-color: var(--card-bg);
+  border-radius: 16px;
+  border: 3px solid hsl(from var(--card-bg) h s calc(l - 5));
+  padding: 30px;
+  width: 100%;
+  max-width: 450px;
+  text-align: center;
+  transition: background-color 0.3s ease;
+}
+
+h1,
+h2 {
+  color: var(--text-main);
+  margin-bottom: 20px;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+.hidden {
+  display: none !important;
+}

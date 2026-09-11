@@ -1,0 +1,51 @@
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+.leaderboard-item {
+  display: flex;
+  align-items: center;
+  background: hsl(from var(--card-bg) h s calc(l - 2));
+  padding: 10px 15px;
+  border-radius: 12px;
+  box-shadow: 0 2px 5px hsl(from var(--text-main) h s l / 0.08);
+  gap: 0.8rem;
+}
+.leaderboard-img {
+  width: 50px;
+}
+.leaderboard-name {
+  text-transform: capitalize;
+}
+@media (prefers-color-scheme: dark) {
+  .leaderboard-item {
+    background: hsl(from var(--card-bg) h s calc(l + 3));
+  }
+}
+
+.leaderboard-votes {
+  font-size: 0.85rem;
+  color: hsl(from var(--text-main) h s calc(l + 25));
+  margin-top: 2px;
+}
+
+.score-badge {
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+}
+
+.score-badge.positive {
+  background-color: hsl(from var(--upvote) h s l / 0.15);
+  color: var(--upvote);
+}
+
+.score-badge.negative {
+  background-color: hsl(from var(--downvote) h s l / 0.15);
+  color: var(--downvote);
+}

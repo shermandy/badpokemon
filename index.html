@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Good Pokémon, Bad Pokémon</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="poke.js" defer></script>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Navigation Tabs -->
+      <div class="tab-controls">
+        <button id="tab-generator-btn" class="tab-btn active">Random</button>
+        <button id="tab-leaderboard-btn" class="tab-btn">Leaderboard</button>
+        <button id="tab-loserboard-btn" class="tab-btn">Loserboard</button>
+      </div>
+
+      <!-- Main Randomizer View -->
+      <div id="generator-view">
+        <h1>Good Pokémon, Bad Pokémon</h1>
+
+        <button id="draw-btn" class="btn-primary">Pick a Random Pokémon</button>
+
+        <div class="pokemon-card">
+          <div id="pokemon-name" class="pokemon-name"></div>
+          <div id="pokemon-types" class="pokemon-types"></div>
+          <div id="img-container" class="img-container" style="display: none">
+            <img id="pokemon-img" class="pokemon-img" src="" alt="Pokemon" />
+          </div>
+          <!-- Voting Section -->
+          <div id="voting-section" class="voting-section" style="display: none">
+            <button id="upvote-btn" class="vote-btn upvote">
+              Good Pokémon
+            </button>
+            <button id="downvote-btn" class="vote-btn downvote">
+              Bad Pokémon
+            </button>
+          </div>
+
+          <!-- Shiny & Forms Controls -->
+          <div class="controls-row">
+            <button id="shiny-btn" class="btn-shiny" style="display: none">
+              View Shiny
+            </button>
+            <select
+              id="variety-select"
+              class="variety-select"
+              style="display: none"
+            ></select>
+          </div>
+
+          <!-- Pokédex Description & External Link -->
+          <div
+            id="pokedex-entry"
+            class="pokedex-entry"
+            style="display: none"
+          ></div>
+          <a
+            id="pokedex-link"
+            class="pokedex-link"
+            href="#"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="display: none"
+          >
+            Pokédex &rarr;
+          </a>
+
+          <div id="stats-container" class="stats-container"></div>
+        </div>
+      </div>
+
+      <!-- Leaderboard View -->
+      <div id="leaderboard-view" class="hidden">
+        <h2>Leaderboard</h2>
+        <div id="leaderboard-list" class="leaderboard-list"></div>
+      </div>
+
+      <!-- Loserboard View -->
+      <div id="loserboard-view" class="hidden">
+        <h2>Loserboard</h2>
+        <div id="loserboard-list" class="leaderboard-list"></div>
+      </div>
+    </div>
+  </body>
+</html>
