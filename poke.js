@@ -393,8 +393,10 @@ function updatePokemonDisplay() {
 
       return `
             <div class="stat-row">
-                <span class="stat-name">${name}</span>
-                <span class="stat-value">${value}</span>
+                <div class="stats-container">
+                    <span class="stat-name">${name}</span>
+                    <span class="stat-value">${value}</span>
+                </div>
                 <div class="stat-bar-background">
                     <div class="stat-bar-fill" style="width: ${percentage}%; background-color: hsl(from var(--stat-fill) h ${saturation}% ${lightness}%);"></div>
                 </div>
