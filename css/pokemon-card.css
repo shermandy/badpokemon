@@ -85,6 +85,24 @@
   transform: scale(0.95);
 }
 
+/* Highlight the clicked button */
+.upvote.selected {
+  border: 2px solid #4caf50;
+  background-color: rgba(76, 175, 80, 0.2);
+  opacity: 1 !important;
+}
+.downvote.selected {
+  border: 2px solid #af4c4c;
+  background-color: rgba(175, 76, 76, 0.2);
+  opacity: 1 !important;
+}
+
+/* Dim the unselected button */
+.vote-btn.disabled:not(.selected) {
+  opacity: 0.35 !important;
+  cursor: not-allowed;
+}
+
 .upvote {
   background-color: hsl(from var(--upvote) h s l / 0.15);
   color: var(--upvote);

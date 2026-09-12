@@ -212,6 +212,21 @@ async function castVote(voteType) {
 
   if (votedIds.includes(pokemonId)) return;
 
+  // --- ADDED: Immediately apply visual feedback and lock buttons ---
+  if (voteType === "upvote") {
+    upvoteBtn.classList.add("selected-vote");
+    downvoteBtn.classList.add("dimmed-vote");
+  } else {
+    downvoteBtn.classList.add("selected-vote");
+    upvoteBtn.classList.add("dimmed-vote");
+  }
+
+  upvoteBtn.disabled = true;
+  downvoteBtn.disabled = true;
+  upvoteBtn.style.cursor = "not-allowed";
+  downvoteBtn.style.cursor = "not-allowed";
+  // ------------------------------------------------------------------
+
   try {
     // Check if record exists
     const { data: existing } = await supabaseClient
@@ -253,6 +268,15 @@ async function castVote(voteType) {
     localStorage.setItem("user_voted_pokemon", JSON.stringify(votedIds));
     fetchVotes(pokemonId);
   } catch (err) {
+    // --- ADDED: Revert classes if the DB write fails ---
+    upvoteBtn.classList.remove("selected-vote", "dimmed-vote");
+    downvoteBtn.classList.remove("selected-vote", "dimmed-vote");
+    upvoteBtn.disabled = false;
+    downvoteBtn.disabled = false;
+    upvoteBtn.style.cursor = "pointer";
+    downvoteBtn.style.cursor = "pointer";
+    // ----------------------------------------------------
+
     console.error("Error submitting vote to Supabase:", err);
     alert("Could not save vote. Please try again!");
   }
