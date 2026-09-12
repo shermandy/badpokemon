@@ -17,6 +17,8 @@ const loseView = document.getElementById("loserboard-view");
 const leadList = document.getElementById("leaderboard-list");
 const loseList = document.getElementById("loserboard-list");
 
+const POKEBALL_IMAGE_PATH = "images/poke-ball.png"; // Or your image path
+
 // Randomizer Elements
 const drawBtn = document.getElementById("draw-btn");
 const shinyBtn = document.getElementById("shiny-btn");
@@ -262,6 +264,7 @@ async function spinSlotMachine() {
 
   const targetId = Math.floor(Math.random() * TOTAL_POKEMON) + 1;
 
+  // 1. Start API requests immediately in background
   const speciesPromise = fetchData(
     `https://pokeapi.co/api/v2/pokemon-species/${targetId}`,
   );
@@ -269,9 +272,13 @@ async function spinSlotMachine() {
     `https://pokeapi.co/api/v2/pokemon/${targetId}`,
   );
 
+  // 2. Prepare UI for the Pokéball animation
   imgContainer.style.display = "flex";
   pokemonImg.style.display = "block";
-  pokemonName.textContent = "Rolling...";
+  pokemonName.textContent = "Catching...";
+
+  // Reset previous animation classes
+  pokemonImg.classList.remove("pokemon-burst");
   pokemonTypes.innerHTML = "";
   statsContainer.innerHTML = "";
   pokedexEntry.style.display = "none";
@@ -280,28 +287,27 @@ async function spinSlotMachine() {
   varietySelect.style.display = "none";
   votingSection.style.display = "none";
 
-  pokemonImg.classList.add("slot-spinning");
+  // Set sprite to Pokéball and start bouncing/wobbling
+  pokemonImg.src = POKEBALL_IMAGE_PATH;
+  pokemonImg.classList.add("pokeball-anim");
 
-  const spinDuration = 2000;
-  const intervalTime = 80;
-
-  const intervalId = setInterval(() => {
-    const randomTempId = Math.floor(Math.random() * TOTAL_POKEMON) + 1;
-    pokemonImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${randomTempId}.png`;
-  }, intervalTime);
-
+  // 3. Wait for API response + enforce a minimum 1.8s animation window
   const [_, speciesData, basePokemonData] = await Promise.all([
-    new Promise((resolve) => setTimeout(resolve, spinDuration)),
+    new Promise((resolve) => setTimeout(resolve, 1800)),
     speciesPromise,
     basePokemonPromise,
   ]);
 
-  clearInterval(intervalId);
-  pokemonImg.classList.remove("slot-spinning");
+  // Remove Pokéball animation
+  pokemonImg.classList.remove("pokeball-anim");
 
   if (basePokemonData) {
     currentPokemonData = basePokemonData;
     currentSpeciesData = speciesData;
+
+    // Trigger burst/reveal animation on the actual Pokémon sprite
+    pokemonImg.classList.add("pokemon-burst");
+
     setupVarietiesDropdown(speciesData);
     updatePokemonDisplay();
   } else {
