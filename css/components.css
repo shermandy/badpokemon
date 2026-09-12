@@ -99,3 +99,13 @@
   max-width: 180px;
   outline: none;
 }
+/* Automatically collapse empty placeholder divs and elements */
+#pokemon-name:empty,
+#pokemon-types:empty,
+#pokedex-entry:empty,
+#stats-container:empty,
+#voting-section:empty {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
