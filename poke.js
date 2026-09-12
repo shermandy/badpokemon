@@ -4,8 +4,7 @@ const TOTAL_POKEMON = 1025;
 const SUPABASE_URL = "https://apgpchkodavylnghsvrw.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_feIwKGyazC52uGp9BWY80A_8jfyutFC";
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 // Tab Elements
 const tabGenBtn = document.getElementById("tab-generator-btn");
 const tabLeadBtn = document.getElementById("tab-leaderboard-btn");
@@ -83,7 +82,7 @@ async function loadRankings(type, containerElement) {
   containerElement.innerHTML = "<p>Loading Pokémon rankings...</p>";
 
   try {
-    let query = supabase.from("pokemon_votes").select("*");
+    let query = supabaseClient.from("pokemon_votes").select("*");
 
     if (type === "leaderboard") {
       // Order by net score or upvotes descending
@@ -155,7 +154,7 @@ function getVotedPokemonIds() {
 // 3. Fetch Votes from Supabase
 async function fetchVotes(pokemonId) {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from("pokemon_votes")
       .select("*")
       .eq("pokemon_id", pokemonId)
@@ -198,7 +197,7 @@ async function castVote(voteType) {
 
   try {
     // Check if record exists
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseClient
       .from("pokemon_votes")
       .select("*")
       .eq("pokemon_id", pokemonId)
@@ -208,7 +207,7 @@ async function castVote(voteType) {
 
     if (!existing) {
       // Insert new row
-      const { error: insertError } = await supabase
+      const { error: insertError } = await supabaseClient
         .from("pokemon_votes")
         .insert([
           {
@@ -222,7 +221,7 @@ async function castVote(voteType) {
       if (insertError) throw insertError;
     } else {
       // Update existing row
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseClient
         .from("pokemon_votes")
         .update({
           upvotes: isUp ? (existing.upvotes || 0) + 1 : existing.upvotes,
