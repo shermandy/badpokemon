@@ -286,6 +286,13 @@ async function castVote(voteType) {
 async function spinSlotMachine() {
   drawBtn.disabled = true;
 
+  upvoteBtn.classList.remove("selected-vote", "dimmed-vote");
+  downvoteBtn.classList.remove("selected-vote", "dimmed-vote");
+  upvoteBtn.disabled = false;
+  downvoteBtn.disabled = false;
+  upvoteBtn.style.cursor = "pointer";
+  downvoteBtn.style.cursor = "pointer";
+
   const targetId = Math.floor(Math.random() * TOTAL_POKEMON) + 1;
 
   // 1. Start API requests immediately in background
