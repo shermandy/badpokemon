@@ -82,17 +82,11 @@ async function loadRankings(type, containerElement) {
   containerElement.innerHTML = "<p>Loading Pokémon rankings...</p>";
 
   try {
-    let query = supabaseClient.from("pokemon_votes").select("*");
-
-    if (type === "leaderboard") {
-      // Order by net score or upvotes descending
-      query = query.order("upvotes", { ascending: false }).limit(20);
-    } else {
-      // Order by downvotes descending for loserboard
-      query = query.order("downvotes", { ascending: false }).limit(20);
-    }
-
-    const { data: rankedPokemon, error } = await query;
+    // Select all votes and compute score on client, or order by net score
+    const { data: rankedPokemon, error } = await supabaseClient
+      .from("pokemon_votes")
+      .select("pokemon_id, upvotes, downvotes")
+      .limit(100);
 
     if (error) throw error;
 
@@ -101,12 +95,35 @@ async function loadRankings(type, containerElement) {
       return;
     }
 
-    const pokemonPromises = rankedPokemon.map((p) =>
+    // Filter & Sort by Net Score in JS
+    let filtered = rankedPokemon.map((p) => ({
+      ...p,
+      netScore: (p.upvotes || 0) - (p.downvotes || 0),
+    }));
+
+    if (type === "leaderboard") {
+      filtered = filtered
+        .filter((p) => p.netScore > 0)
+        .sort((a, b) => b.netScore - a.netScore);
+    } else {
+      filtered = filtered
+        .filter((p) => p.netScore < 0)
+        .sort((a, b) => a.netScore - b.netScore);
+    }
+
+    const top25 = filtered.slice(0, 25);
+
+    if (top25.length === 0) {
+      containerElement.innerHTML = "<p>No eligible Pokémon found yet!</p>";
+      return;
+    }
+
+    const pokemonPromises = top25.map((p) =>
       fetchData(`https://pokeapi.co/api/v2/pokemon/${p.pokemon_id}`),
     );
     const pokemonDetails = await Promise.all(pokemonPromises);
 
-    containerElement.innerHTML = rankedPokemon
+    containerElement.innerHTML = top25
       .map((entry, index) => {
         const details = pokemonDetails[index];
         const name = details
@@ -117,10 +134,8 @@ async function loadRankings(type, containerElement) {
             details.sprites.front_default
           : "";
 
-        const up = entry.upvotes || 0;
-        const down = entry.downvotes || 0;
-        const netScore = up - down;
-        const formattedNet = netScore > 0 ? `+${netScore}` : `${netScore}`;
+        const formattedNet =
+          entry.netScore > 0 ? `+${entry.netScore}` : `${entry.netScore}`;
 
         return `
             <div class="leaderboard-item">
@@ -129,10 +144,10 @@ async function loadRankings(type, containerElement) {
                 <div class="leaderboard-info">
                     <div class="leaderboard-name">${name}</div>
                     <div class="leaderboard-votes">
-                        👍 ${up} &nbsp;👎 ${down}
+                        👍 ${entry.upvotes || 0} &nbsp;👎 ${entry.downvotes || 0}
                     </div>
                 </div>
-                <div class="score-badge ${netScore >= 0 ? "positive" : "negative"}">
+                <div class="score-badge ${entry.netScore >= 0 ? "positive" : "negative"}">
                     ${formattedNet}
                 </div>
             </div>
@@ -140,7 +155,7 @@ async function loadRankings(type, containerElement) {
       })
       .join("");
   } catch (err) {
-    console.error("Error loading rankings from Supabase:", err);
+    console.error("Error loading rankings:", err);
     containerElement.innerHTML = "<p>Failed to load rankings.</p>";
   }
 }
