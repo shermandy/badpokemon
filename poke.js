@@ -1,5 +1,10 @@
 const TOTAL_POKEMON = 1025;
-const BACKEND_URL = "http://localhost:3000/api";
+
+// 1. Initialize Supabase Client
+const SUPABASE_URL = "https://apgpchkodavylnghsvrw.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_feIwKGyazC52uGp9BWY80A_8jfyutFC";
+
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // Tab Elements
 const tabGenBtn = document.getElementById("tab-generator-btn");
@@ -53,15 +58,15 @@ tabGenBtn.addEventListener("click", () => {
 
 tabLeadBtn.addEventListener("click", () => {
   setActiveTab(tabLeadBtn, leadView);
-  loadRankings(`${BACKEND_URL}/leaderboard`, leadList);
+  loadRankings("leaderboard", leadList);
 });
 
 tabLoseBtn.addEventListener("click", () => {
   setActiveTab(tabLoseBtn, loseView);
-  loadRankings(`${BACKEND_URL}/loserboard`, loseList);
+  loadRankings("loserboard", loseList);
 });
 
-// Fetch helper
+// Fetch helper for PokéAPI
 async function fetchData(url) {
   try {
     const response = await fetch(url);
@@ -73,13 +78,24 @@ async function fetchData(url) {
   }
 }
 
-// Shared Leaderboard & Loserboard Fetching Logic
-async function loadRankings(endpointUrl, containerElement) {
+// 2. Updated Leaderboard & Loserboard Fetching via Supabase
+async function loadRankings(type, containerElement) {
   containerElement.innerHTML = "<p>Loading Pokémon rankings...</p>";
 
   try {
-    const res = await fetch(endpointUrl);
-    const rankedPokemon = await res.json();
+    let query = supabase.from("pokemon_votes").select("*");
+
+    if (type === "leaderboard") {
+      // Order by net score or upvotes descending
+      query = query.order("upvotes", { ascending: false }).limit(20);
+    } else {
+      // Order by downvotes descending for loserboard
+      query = query.order("downvotes", { ascending: false }).limit(20);
+    }
+
+    const { data: rankedPokemon, error } = await query;
+
+    if (error) throw error;
 
     if (!rankedPokemon || rankedPokemon.length === 0) {
       containerElement.innerHTML = "<p>No eligible Pokémon found yet!</p>";
@@ -102,28 +118,30 @@ async function loadRankings(endpointUrl, containerElement) {
             details.sprites.front_default
           : "";
 
-        const netScore = entry.upvotes - entry.downvotes;
+        const up = entry.upvotes || 0;
+        const down = entry.downvotes || 0;
+        const netScore = up - down;
         const formattedNet = netScore > 0 ? `+${netScore}` : `${netScore}`;
 
         return `
-                <div class="leaderboard-item">
-                    <span class="rank-badge">#${index + 1}</span>
-                    <img class="leaderboard-img" src="${img}" alt="${name}">
-                    <div class="leaderboard-info">
-                        <div class="leaderboard-name">${name}</div>
-                        <div class="leaderboard-votes">
-                            👍 ${entry.upvotes} &nbsp;👎 ${entry.downvotes}
-                        </div>
-                    </div>
-                    <div class="score-badge ${netScore >= 0 ? "positive" : "negative"}">
-                        ${formattedNet}
+            <div class="leaderboard-item">
+                <span class="rank-badge">#${index + 1}</span>
+                <img class="leaderboard-img" src="${img}" alt="${name}">
+                <div class="leaderboard-info">
+                    <div class="leaderboard-name">${name}</div>
+                    <div class="leaderboard-votes">
+                        👍 ${up} &nbsp;👎 ${down}
                     </div>
                 </div>
-            `;
+                <div class="score-badge ${netScore >= 0 ? "positive" : "negative"}">
+                    ${formattedNet}
+                </div>
+            </div>
+        `;
       })
       .join("");
   } catch (err) {
-    console.error("Error loading rankings:", err);
+    console.error("Error loading rankings from Supabase:", err);
     containerElement.innerHTML = "<p>Failed to load rankings.</p>";
   }
 }
@@ -134,14 +152,22 @@ function getVotedPokemonIds() {
   return saved ? JSON.parse(saved) : [];
 }
 
+// 3. Fetch Votes from Supabase
 async function fetchVotes(pokemonId) {
   try {
-    const res = await fetch(`${BACKEND_URL}/votes/${pokemonId}`);
-    if (!res.ok) throw new Error("Failed to fetch votes");
-    const data = await res.json();
+    const { data, error } = await supabase
+      .from("pokemon_votes")
+      .select("*")
+      .eq("pokemon_id", pokemonId)
+      .maybeSingle();
 
-    // upvoteCount.textContent = data.upvotes || 0;
-    // downvoteCount.textContent = data.downvotes || 0;
+    if (error) throw error;
+
+    if (upvoteCount && downvoteCount) {
+      upvoteCount.textContent = data ? data.upvotes || 0 : 0;
+      downvoteCount.textContent = data ? data.downvotes || 0 : 0;
+    }
+
     votingSection.style.display = "flex";
 
     const votedIds = getVotedPokemonIds();
@@ -155,33 +181,64 @@ async function fetchVotes(pokemonId) {
     upvoteBtn.style.cursor = hasVoted ? "not-allowed" : "pointer";
     downvoteBtn.style.cursor = hasVoted ? "not-allowed" : "pointer";
   } catch (err) {
-    console.error("Error fetching votes from server:", err);
+    console.error("Error fetching votes from Supabase:", err);
     votingSection.style.display = "none";
   }
 }
 
+// 4. Cast Vote directly to Supabase
 async function castVote(voteType) {
   if (!currentPokemonData) return;
 
   const pokemonId = currentPokemonData.id;
+  const pokemonNameStr = currentPokemonData.name;
   const votedIds = getVotedPokemonIds();
+
   if (votedIds.includes(pokemonId)) return;
 
   try {
-    const res = await fetch(`${BACKEND_URL}/votes`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pokemonId, voteType }),
-    });
+    // Check if record exists
+    const { data: existing } = await supabase
+      .from("pokemon_votes")
+      .select("*")
+      .eq("pokemon_id", pokemonId)
+      .maybeSingle();
 
-    if (res.ok) {
-      votedIds.push(pokemonId);
-      localStorage.setItem("user_voted_pokemon", JSON.stringify(votedIds));
-      fetchVotes(pokemonId);
+    const isUp = voteType === "upvote";
+
+    if (!existing) {
+      // Insert new row
+      const { error: insertError } = await supabase
+        .from("pokemon_votes")
+        .insert([
+          {
+            pokemon_id: pokemonId,
+            pokemon_name: pokemonNameStr,
+            upvotes: isUp ? 1 : 0,
+            downvotes: isUp ? 0 : 1,
+          },
+        ]);
+
+      if (insertError) throw insertError;
+    } else {
+      // Update existing row
+      const { error: updateError } = await supabase
+        .from("pokemon_votes")
+        .update({
+          upvotes: isUp ? (existing.upvotes || 0) + 1 : existing.upvotes,
+          downvotes: !isUp ? (existing.downvotes || 0) + 1 : existing.downvotes,
+        })
+        .eq("pokemon_id", pokemonId);
+
+      if (updateError) throw updateError;
     }
+
+    votedIds.push(pokemonId);
+    localStorage.setItem("user_voted_pokemon", JSON.stringify(votedIds));
+    fetchVotes(pokemonId);
   } catch (err) {
-    console.error("Error sending vote to server:", err);
-    alert("Could not save vote. Make sure your local server is running!");
+    console.error("Error submitting vote to Supabase:", err);
+    alert("Could not save vote. Please try again!");
   }
 }
 
@@ -309,20 +366,13 @@ function updatePokemonDisplay() {
       const name = statAbbreviations[s.stat.name] || s.stat.name;
       const value = s.base_stat;
 
-      // Normalize percentage (0 to 100 based on max base stat around 200)
       const percentage = Math.min((value / 200) * 100, 100);
-
-      // Saturation stays the same: Low stats (25% muted) -> High stats (95% rich color)
       const saturation = Math.round(25 + percentage * 0.7);
 
-      // Check if user is in Light Mode (via body class or OS preference)
       const isLightMode =
         document.body.classList.contains("light-mode") ||
         window.matchMedia("(prefers-color-scheme: light)").matches;
 
-      // Flip Lightness mapping for Light Mode vs Dark Mode:
-      // Dark Mode:  Low stat = 35% (Darker)  -> High stat = 85% (Lighter)
-      // Light Mode: Low stat = 85% (Lighter) -> High stat = 30% (Darker)
       const lightness = isLightMode
         ? Math.round(85 - percentage * 0.55)
         : Math.round(35 + percentage * 0.5);
