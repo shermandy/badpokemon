@@ -393,7 +393,7 @@ function updatePokemonDisplay() {
 
       return `
             <div class="stat-row">
-                <div class="stats-container">
+                <div class="stat-value-wrapper">
                     <span class="stat-name">${name}</span>
                     <span class="stat-value">${value}</span>
                 </div>
