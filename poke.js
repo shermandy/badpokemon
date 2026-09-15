@@ -128,6 +128,7 @@ async function loadRankings(type, containerElement) {
     containerElement.innerHTML = top25
       .map((entry, index) => {
         const details = pokemonDetails[index];
+
         const name = details
           ? details.name.replace(/-/g, " ")
           : `Pokémon #${entry.pokemon_id}`;
@@ -135,14 +136,16 @@ async function loadRankings(type, containerElement) {
           ? details.sprites.other["official-artwork"]?.front_default ||
             details.sprites.front_default
           : "";
-
+        const linkName = name.split(" ")[0];
         const formattedNet =
           entry.netScore > 0 ? `+${entry.netScore}` : `${entry.netScore}`;
 
         return `
             <div class="leaderboard-item">
                 <span class="rank-badge">#${index + 1}</span>
+                <a target="_new" href="https://pokemondb.net/pokedex/${name.split(" ")[0]}">
                 <img class="leaderboard-img" src="${img}" alt="${name}">
+                </a>
                 <div class="leaderboard-info">
                     <div class="leaderboard-name">${name}</div>
                     <div class="leaderboard-votes">
