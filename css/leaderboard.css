@@ -9,7 +9,6 @@
   background: hsl(from var(--card-bg) h s calc(l - 2));
   padding: 10px 15px;
   border-radius: 12px;
-  box-shadow: 0 2px 5px hsl(from var(--text-main) h s l / 0.08);
   gap: 0.8rem;
 }
 .leaderboard-img {
