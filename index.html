@@ -28,9 +28,10 @@
   </head>
   <body>
     <div class="container">
-      <!-- Navigation Tabs -->
+      <!-- Tab Bar -->
       <div class="tab-controls">
         <button id="tab-generator-btn" class="tab-btn active">Random</button>
+        <button id="tab-battle-btn" class="tab-btn">Battle</button>
         <button id="tab-leaderboard-btn" class="tab-btn">Leaders</button>
         <button id="tab-loserboard-btn" class="tab-btn">Losers</button>
         <button id="tab-controversial-btn" class="tab-btn">
@@ -42,7 +43,7 @@
       <div id="generator-view">
         <h1>Good Pokémon, Bad Pokémon</h1>
 
-        <button id="draw-btn" class="btn-primary">Pick a Random Pokémon</button>
+        <!-- <button id="draw-btn" class="btn-primary">Pick a Random Pokémon</button> -->
 
         <div class="pokemon-card">
           <div id="pokemon-name" class="pokemon-name"></div>
@@ -109,6 +110,14 @@
       <div id="controversial-view" class="hidden">
         <h2>Controversial</h2>
         <div id="controversial-list" class="leaderboard-list"></div>
+      </div>
+      <!-- Battle View Container -->
+      <div id="battle-view" class="hidden">
+        <h2>Pokémon Head-to-Head</h2>
+        <div class="battle-grid">
+          <div id="battle-p1"></div>
+          <div id="battle-p2"></div>
+        </div>
       </div>
     </div>
   </body>

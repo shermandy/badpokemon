@@ -11,12 +11,14 @@ const tabGenBtn = document.getElementById("tab-generator-btn");
 const tabLeadBtn = document.getElementById("tab-leaderboard-btn");
 const tabLoseBtn = document.getElementById("tab-loserboard-btn");
 const tabControversialBtn = document.getElementById("tab-controversial-btn");
+const tabBattleBtn = document.getElementById("tab-battle-btn");
 
 // View Elements
 const genView = document.getElementById("generator-view");
 const leadView = document.getElementById("leaderboard-view");
 const loseView = document.getElementById("loserboard-view");
 const controversialView = document.getElementById("controversial-view");
+const battleView = document.getElementById("battle-view");
 
 // List Containers
 const leadList = document.getElementById("leaderboard-list");
@@ -48,14 +50,28 @@ let currentPokemonData = null;
 let currentSpeciesData = null;
 let isShiny = false;
 
+// Battle state tracker
+let battleState = {
+  p1: null,
+  p2: null,
+};
+
 // Tab Switching Event Listeners
 function setActiveTab(activeBtn, activeView) {
-  const tabs = [tabGenBtn, tabLeadBtn, tabLoseBtn, tabControversialBtn].filter(
-    Boolean,
-  );
-  const views = [genView, leadView, loseView, controversialView].filter(
-    Boolean,
-  );
+  const tabs = [
+    tabGenBtn,
+    tabLeadBtn,
+    tabLoseBtn,
+    tabControversialBtn,
+    tabBattleBtn,
+  ].filter(Boolean);
+  const views = [
+    genView,
+    leadView,
+    loseView,
+    controversialView,
+    battleView,
+  ].filter(Boolean);
 
   tabs.forEach((btn) => btn.classList.remove("active"));
   views.forEach((view) => view.classList.add("hidden"));
@@ -65,9 +81,7 @@ function setActiveTab(activeBtn, activeView) {
 }
 
 if (tabGenBtn) {
-  tabGenBtn.addEventListener("click", () => {
-    setActiveTab(tabGenBtn, genView);
-  });
+  tabGenBtn.addEventListener("click", () => setActiveTab(tabGenBtn, genView));
 }
 
 if (tabLeadBtn) {
@@ -93,6 +107,13 @@ if (tabControversialBtn) {
   });
 }
 
+if (tabBattleBtn) {
+  tabBattleBtn.addEventListener("click", () => {
+    setActiveTab(tabBattleBtn, battleView);
+    startNewBattle();
+  });
+}
+
 // Fetch helper for PokéAPI
 async function fetchData(url) {
   try {
@@ -103,6 +124,47 @@ async function fetchData(url) {
     console.error("Fetch error:", error);
     return null;
   }
+}
+
+// Helper: render stat bars
+function renderStatsHTML(stats) {
+  const statAbbreviations = {
+    hp: "HP",
+    attack: "Attack",
+    defense: "Defense",
+    "special-attack": "Sp. Atk",
+    "special-defense": "Sp. Def",
+    speed: "Speed",
+  };
+
+  return stats
+    .map((s) => {
+      const name = statAbbreviations[s.stat.name] || s.stat.name;
+      const value = s.base_stat;
+      const percentage = Math.min((value / 200) * 100, 100);
+      const saturation = Math.round(25 + percentage * 0.7);
+
+      const isLightMode =
+        document.body.classList.contains("light-mode") ||
+        window.matchMedia("(prefers-color-scheme: light)").matches;
+
+      const lightness = isLightMode
+        ? Math.round(85 - percentage * 0.55)
+        : Math.round(35 + percentage * 0.5);
+
+      return `
+        <div class="stat-row">
+            <div class="stat-value-wrapper">
+                <span class="stat-name">${name}</span>
+                <span class="stat-value">${value}</span>
+            </div>
+            <div class="stat-bar-background">
+                <div class="stat-bar-fill" style="width: ${percentage}%; background-color: hsl(from var(--stat-fill) h ${saturation}% ${lightness}%);"></div>
+            </div>
+        </div>
+      `;
+    })
+    .join("");
 }
 
 // 2. Leaderboard, Loserboard & Controversial Fetching via Supabase
@@ -123,13 +185,11 @@ async function loadRankings(type, containerElement) {
       return;
     }
 
-    // Process vote calculations
     let processed = rankedPokemon.map((p) => {
       const up = p.upvotes || 0;
       const down = p.downvotes || 0;
       const total = up + down;
       const netScore = up - down;
-      // Formula rewards high vote volume + balanced up/down ratio
       const controversyScore = total / (Math.abs(netScore) + 1);
 
       return {
@@ -173,7 +233,6 @@ async function loadRankings(type, containerElement) {
     containerElement.innerHTML = top25
       .map((entry, index) => {
         const details = pokemonDetails[index];
-
         const name = details
           ? details.name.replace(/-/g, " ")
           : `Pokémon #${entry.pokemon_id}`;
@@ -227,6 +286,41 @@ function getVotedPokemonIds() {
   return saved ? JSON.parse(saved) : [];
 }
 
+// Record vote in Supabase helper
+async function recordSingleVote(pokemonId, pokemonNameStr, isUpvote) {
+  const { data: existing } = await supabaseClient
+    .from("pokemon_votes")
+    .select("*")
+    .eq("pokemon_id", pokemonId)
+    .maybeSingle();
+
+  if (!existing) {
+    const { error: insertError } = await supabaseClient
+      .from("pokemon_votes")
+      .insert([
+        {
+          pokemon_id: pokemonId,
+          pokemon_name: pokemonNameStr,
+          upvotes: isUpvote ? 1 : 0,
+          downvotes: isUpvote ? 0 : 1,
+        },
+      ]);
+    if (insertError) throw insertError;
+  } else {
+    const { error: updateError } = await supabaseClient
+      .from("pokemon_votes")
+      .update({
+        upvotes: isUpvote ? (existing.upvotes || 0) + 1 : existing.upvotes,
+        downvotes: !isUpvote
+          ? (existing.downvotes || 0) + 1
+          : existing.downvotes,
+      })
+      .eq("pokemon_id", pokemonId);
+
+    if (updateError) throw updateError;
+  }
+}
+
 // 3. Fetch Votes from Supabase
 async function fetchVotes(pokemonId) {
   try {
@@ -262,6 +356,7 @@ async function fetchVotes(pokemonId) {
 }
 
 // 4. Cast Vote directly to Supabase
+// 4. Cast Vote directly to Supabase
 async function castVote(voteType) {
   if (!currentPokemonData) return;
 
@@ -285,42 +380,15 @@ async function castVote(voteType) {
   downvoteBtn.style.cursor = "not-allowed";
 
   try {
-    const { data: existing } = await supabaseClient
-      .from("pokemon_votes")
-      .select("*")
-      .eq("pokemon_id", pokemonId)
-      .maybeSingle();
-
-    const isUp = voteType === "upvote";
-
-    if (!existing) {
-      const { error: insertError } = await supabaseClient
-        .from("pokemon_votes")
-        .insert([
-          {
-            pokemon_id: pokemonId,
-            pokemon_name: pokemonNameStr,
-            upvotes: isUp ? 1 : 0,
-            downvotes: isUp ? 0 : 1,
-          },
-        ]);
-
-      if (insertError) throw insertError;
-    } else {
-      const { error: updateError } = await supabaseClient
-        .from("pokemon_votes")
-        .update({
-          upvotes: isUp ? (existing.upvotes || 0) + 1 : existing.upvotes,
-          downvotes: !isUp ? (existing.downvotes || 0) + 1 : existing.downvotes,
-        })
-        .eq("pokemon_id", pokemonId);
-
-      if (updateError) throw updateError;
-    }
+    await recordSingleVote(pokemonId, pokemonNameStr, voteType === "upvote");
 
     votedIds.push(pokemonId);
     localStorage.setItem("user_voted_pokemon", JSON.stringify(votedIds));
-    fetchVotes(pokemonId);
+
+    // Brief pause to show button vote feedback, then load next random Pokémon
+    setTimeout(() => {
+      spinSlotMachine();
+    }, 400);
   } catch (err) {
     upvoteBtn.classList.remove("selected-vote", "dimmed-vote");
     downvoteBtn.classList.remove("selected-vote", "dimmed-vote");
@@ -334,20 +402,111 @@ async function castVote(voteType) {
   }
 }
 
+// 5. BATTLE LOGIC
+async function startNewBattle() {
+  if (!battleView) return;
+
+  const p1Container = document.getElementById("battle-p1");
+  const p2Container = document.getElementById("battle-p2");
+  if (!p1Container || !p2Container) return;
+
+  // Render initial loading cards with animated Pokéballs
+  renderBattleLoadingCard(p1Container, "Pokémon 1");
+  renderBattleLoadingCard(p2Container, "Pokémon 2");
+
+  // Pick 2 random IDs out of the total pool (1 to 1025), regardless of prior votes
+  const id1 = Math.floor(Math.random() * TOTAL_POKEMON) + 1;
+  let id2 = Math.floor(Math.random() * TOTAL_POKEMON) + 1;
+
+  // Ensure combatant 2 is distinct from combatant 1
+  while (id1 === id2) {
+    id2 = Math.floor(Math.random() * TOTAL_POKEMON) + 1;
+  }
+
+  // Fetch Pokémon data with minimum delay to allow Pokéball animation to play
+  const [_, p1Data, p2Data] = await Promise.all([
+    new Promise((resolve) => setTimeout(resolve, 1800)),
+    fetchData(`https://pokeapi.co/api/v2/pokemon/${id1}`),
+    fetchData(`https://pokeapi.co/api/v2/pokemon/${id2}`),
+  ]);
+
+  if (!p1Data || !p2Data) {
+    battleView.innerHTML = "<p>Failed to initialize battle. Try again!</p>";
+    return;
+  }
+
+  battleState.p1 = p1Data;
+  battleState.p2 = p2Data;
+
+  renderBattleCard(p1Container, p1Data, 1);
+  renderBattleCard(p2Container, p2Data, 2);
+}
+
+// Render temporary state showing spinning Pokéball
+function renderBattleLoadingCard(container, label) {
+  container.innerHTML = `
+    <div class="battle-card">
+      <img src="${POKEBALL_IMAGE_PATH}" alt="Catching..." class="battle-img pokeball-anim">
+      <h3 class="battle-name">Catching ${label}...</h3>
+    </div>
+  `;
+}
+
+function renderBattleCard(container, data, playerNum) {
+  const name = data.name.replace(/-/g, " ");
+  const img =
+    data.sprites.other["official-artwork"]?.front_default ||
+    data.sprites.front_default;
+  const types = data.types
+    .map((t) => `<span class="type-badge">${t.type.name}</span>`)
+    .join("");
+  const statsHTML = renderStatsHTML(data.stats);
+
+  container.innerHTML = `
+    <div class="battle-card">
+      <img src="${img}" alt="${name}" class="battle-img pokemon-burst">
+      <h3 class="battle-name">${name}</h3>
+      <div class="battle-types">${types}</div>
+      <button class="battle-choose-btn" onclick="resolveBattle(${playerNum})">Choose ${name}</button>
+      <div class="battle-stats">${statsHTML}</div>
+    </div>
+  `;
+}
+
+// Global scope binding for inline onclick
+window.resolveBattle = async function (winnerNum) {
+  const winner = winnerNum === 1 ? battleState.p1 : battleState.p2;
+  const loser = winnerNum === 1 ? battleState.p2 : battleState.p1;
+
+  if (!winner || !loser) return;
+
+  const btns = document.querySelectorAll(".battle-choose-btn");
+  btns.forEach((btn) => {
+    btn.disabled = true;
+    btn.style.opacity = "0.5";
+    btn.style.cursor = "not-allowed";
+  });
+
+  try {
+    await Promise.all([
+      recordSingleVote(winner.id, winner.name, true),
+      recordSingleVote(loser.id, loser.name, false),
+    ]);
+  } catch (err) {
+    console.error("Battle resolution error:", err);
+  }
+
+  startNewBattle();
+};
+
 // Slot Machine & Display Logic
 async function spinSlotMachine() {
-  drawBtn.disabled = true;
-
   const votedIds = getVotedPokemonIds();
-
-  // Filter out voted IDs
   const allIds = Array.from({ length: TOTAL_POKEMON }, (_, i) => i + 1);
   const unvotedIds = allIds.filter((id) => !votedIds.includes(id));
 
   if (unvotedIds.length === 0) {
-    pokemonName.textContent =
-      "You caught them all! No More Pokémon left to judge.";
-    drawBtn.disabled = false;
+    alert("Congratulations! You have voted on every single Pokémon!");
     return;
   }
 
@@ -358,7 +517,6 @@ async function spinSlotMachine() {
   upvoteBtn.style.cursor = "pointer";
   downvoteBtn.style.cursor = "pointer";
 
-  // Pick targetId from unvoted array
   const randomIndex = Math.floor(Math.random() * unvotedIds.length);
   const targetId = unvotedIds[randomIndex];
 
@@ -404,8 +562,6 @@ async function spinSlotMachine() {
   } else {
     pokemonName.textContent = "Failed to load!";
   }
-
-  drawBtn.disabled = false;
 }
 
 function setupVarietiesDropdown(speciesData) {
@@ -462,50 +618,12 @@ function updatePokemonDisplay() {
   pokedexLink.href = `https://pokemondb.net/pokedex/${baseName}`;
   pokedexLink.style.display = "inline-block";
 
-  const statAbbreviations = {
-    hp: "HP",
-    attack: "Attack",
-    defense: "Defense",
-    "special-attack": "Sp. Atk",
-    "special-defense": "Sp. Def",
-    speed: "Speed",
-  };
-
-  statsContainer.innerHTML = currentPokemonData.stats
-    .map((s) => {
-      const name = statAbbreviations[s.stat.name] || s.stat.name;
-      const value = s.base_stat;
-
-      const percentage = Math.min((value / 200) * 100, 100);
-      const saturation = Math.round(25 + percentage * 0.7);
-
-      const isLightMode =
-        document.body.classList.contains("light-mode") ||
-        window.matchMedia("(prefers-color-scheme: light)").matches;
-
-      const lightness = isLightMode
-        ? Math.round(85 - percentage * 0.55)
-        : Math.round(35 + percentage * 0.5);
-
-      return `
-            <div class="stat-row">
-                <div class="stat-value-wrapper">
-                    <span class="stat-name">${name}</span>
-                    <span class="stat-value">${value}</span>
-                </div>
-                <div class="stat-bar-background">
-                    <div class="stat-bar-fill" style="width: ${percentage}%; background-color: hsl(from var(--stat-fill) h ${saturation}% ${lightness}%);"></div>
-                </div>
-            </div>
-        `;
-    })
-    .join("");
+  statsContainer.innerHTML = renderStatsHTML(currentPokemonData.stats);
 
   fetchVotes(currentPokemonData.id);
 }
 
-// Event Listeners
-drawBtn.addEventListener("click", spinSlotMachine);
+// Event Listeners (Removed drawBtn listener)
 upvoteBtn.addEventListener("click", () => castVote("upvote"));
 downvoteBtn.addEventListener("click", () => castVote("downvote"));
 
@@ -523,3 +641,6 @@ varietySelect.addEventListener("change", async (e) => {
     updatePokemonDisplay();
   }
 });
+
+// Automatically trigger on page load
+document.addEventListener("DOMContentLoaded", spinSlotMachine);

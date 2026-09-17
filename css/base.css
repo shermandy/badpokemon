@@ -21,8 +21,8 @@ body {
   border-radius: 16px;
   border: 3px solid hsl(from var(--card-bg) h s calc(l - 5));
   padding: 30px;
-  width: 100%;
-  max-width: 450px;
+  /* width: 100%;
+  max-width: 450px; */
   text-align: center;
   transition: background-color 0.3s ease;
 }
