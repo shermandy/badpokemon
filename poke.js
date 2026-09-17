@@ -5,19 +5,25 @@ const SUPABASE_URL = "https://apgpchkodavylnghsvrw.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_feIwKGyazC52uGp9BWY80A_8jfyutFC";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 // Tab Elements
 const tabGenBtn = document.getElementById("tab-generator-btn");
 const tabLeadBtn = document.getElementById("tab-leaderboard-btn");
 const tabLoseBtn = document.getElementById("tab-loserboard-btn");
+const tabControversialBtn = document.getElementById("tab-controversial-btn");
 
+// View Elements
 const genView = document.getElementById("generator-view");
 const leadView = document.getElementById("leaderboard-view");
 const loseView = document.getElementById("loserboard-view");
+const controversialView = document.getElementById("controversial-view");
 
+// List Containers
 const leadList = document.getElementById("leaderboard-list");
 const loseList = document.getElementById("loserboard-list");
+const controversialList = document.getElementById("controversial-list");
 
-const POKEBALL_IMAGE_PATH = "images/poke-ball.png"; // Or your image path
+const POKEBALL_IMAGE_PATH = "images/poke-ball.png";
 
 // Randomizer Elements
 const drawBtn = document.getElementById("draw-btn");
@@ -44,28 +50,48 @@ let isShiny = false;
 
 // Tab Switching Event Listeners
 function setActiveTab(activeBtn, activeView) {
-  [tabGenBtn, tabLeadBtn, tabLoseBtn].forEach((btn) =>
-    btn.classList.remove("active"),
+  const tabs = [tabGenBtn, tabLeadBtn, tabLoseBtn, tabControversialBtn].filter(
+    Boolean,
   );
-  [genView, leadView, loseView].forEach((view) => view.classList.add("hidden"));
+  const views = [genView, leadView, loseView, controversialView].filter(
+    Boolean,
+  );
 
-  activeBtn.classList.add("active");
-  activeView.classList.remove("hidden");
+  tabs.forEach((btn) => btn.classList.remove("active"));
+  views.forEach((view) => view.classList.add("hidden"));
+
+  if (activeBtn) activeBtn.classList.add("active");
+  if (activeView) activeView.classList.remove("hidden");
 }
 
-tabGenBtn.addEventListener("click", () => {
-  setActiveTab(tabGenBtn, genView);
-});
+if (tabGenBtn) {
+  tabGenBtn.addEventListener("click", () => {
+    setActiveTab(tabGenBtn, genView);
+  });
+}
 
-tabLeadBtn.addEventListener("click", () => {
-  setActiveTab(tabLeadBtn, leadView);
-  loadRankings("leaderboard", leadList);
-});
+if (tabLeadBtn) {
+  tabLeadBtn.addEventListener("click", () => {
+    setActiveTab(tabLeadBtn, leadView);
+    loadRankings("leaderboard", leadList);
+  });
+}
 
-tabLoseBtn.addEventListener("click", () => {
-  setActiveTab(tabLoseBtn, loseView);
-  loadRankings("loserboard", loseList);
-});
+if (tabLoseBtn) {
+  tabLoseBtn.addEventListener("click", () => {
+    setActiveTab(tabLoseBtn, loseView);
+    loadRankings("loserboard", loseList);
+  });
+}
+
+if (tabControversialBtn) {
+  tabControversialBtn.addEventListener("click", () => {
+    const targetView = controversialView || leadView;
+    const targetList = controversialList || leadList;
+    setActiveTab(tabControversialBtn, targetView);
+    loadRankings("controversial", targetList);
+  });
+}
 
 // Fetch helper for PokéAPI
 async function fetchData(url) {
@@ -79,16 +105,16 @@ async function fetchData(url) {
   }
 }
 
-// 2. Updated Leaderboard & Loserboard Fetching via Supabase
+// 2. Leaderboard, Loserboard & Controversial Fetching via Supabase
 async function loadRankings(type, containerElement) {
+  if (!containerElement) return;
   containerElement.innerHTML = "<p>Loading Pokémon rankings...</p>";
 
   try {
-    // Select all votes and compute score on client, or order by net score
     const { data: rankedPokemon, error } = await supabaseClient
       .from("pokemon_votes")
       .select("pokemon_id, upvotes, downvotes")
-      .limit(100);
+      .limit(200);
 
     if (error) throw error;
 
@@ -97,20 +123,39 @@ async function loadRankings(type, containerElement) {
       return;
     }
 
-    // Filter & Sort by Net Score in JS
-    let filtered = rankedPokemon.map((p) => ({
-      ...p,
-      netScore: (p.upvotes || 0) - (p.downvotes || 0),
-    }));
+    // Process vote calculations
+    let processed = rankedPokemon.map((p) => {
+      const up = p.upvotes || 0;
+      const down = p.downvotes || 0;
+      const total = up + down;
+      const netScore = up - down;
+      // Formula rewards high vote volume + balanced up/down ratio
+      const controversyScore = total / (Math.abs(netScore) + 1);
+
+      return {
+        ...p,
+        up,
+        down,
+        total,
+        netScore,
+        controversyScore,
+      };
+    });
+
+    let filtered = [];
 
     if (type === "leaderboard") {
-      filtered = filtered
+      filtered = processed
         .filter((p) => p.netScore > 0)
         .sort((a, b) => b.netScore - a.netScore);
-    } else {
-      filtered = filtered
+    } else if (type === "loserboard") {
+      filtered = processed
         .filter((p) => p.netScore < 0)
         .sort((a, b) => a.netScore - b.netScore);
+    } else if (type === "controversial") {
+      filtered = processed
+        .filter((p) => p.up > 0 && p.down > 0 && p.total >= 2)
+        .sort((a, b) => b.controversyScore - a.controversyScore);
     }
 
     const top25 = filtered.slice(0, 25);
@@ -136,24 +181,35 @@ async function loadRankings(type, containerElement) {
           ? details.sprites.other["official-artwork"]?.front_default ||
             details.sprites.front_default
           : "";
-        const linkName = name.split(" ")[0];
-        const formattedNet =
-          entry.netScore > 0 ? `+${entry.netScore}` : `${entry.netScore}`;
+
+        const badgeText =
+          type === "controversial"
+            ? `${entry.controversyScore.toFixed(1)}`
+            : entry.netScore > 0
+              ? `+${entry.netScore}`
+              : `${entry.netScore}`;
+
+        const badgeClass =
+          type === "controversial"
+            ? "neutral"
+            : entry.netScore >= 0
+              ? "positive"
+              : "negative";
 
         return `
             <div class="leaderboard-item">
                 <span class="rank-badge">#${index + 1}</span>
                 <a target="_new" href="https://pokemondb.net/pokedex/${name.split(" ")[0]}">
-                <img class="leaderboard-img" src="${img}" alt="${name}">
+                  <img class="leaderboard-img" src="${img}" alt="${name}">
                 </a>
                 <div class="leaderboard-info">
                     <div class="leaderboard-name">${name}</div>
                     <div class="leaderboard-votes">
-                        👍 ${entry.upvotes || 0} &nbsp;👎 ${entry.downvotes || 0}
+                        👍 ${entry.up} &nbsp;👎 ${entry.down}
                     </div>
                 </div>
-                <div class="score-badge ${entry.netScore >= 0 ? "positive" : "negative"}">
-                    ${formattedNet}
+                <div class="score-badge ${badgeClass}">
+                    ${badgeText}
                 </div>
             </div>
         `;
@@ -215,7 +271,6 @@ async function castVote(voteType) {
 
   if (votedIds.includes(pokemonId)) return;
 
-  // --- ADDED: Immediately apply visual feedback and lock buttons ---
   if (voteType === "upvote") {
     upvoteBtn.classList.add("selected-vote");
     downvoteBtn.classList.add("dimmed-vote");
@@ -228,10 +283,8 @@ async function castVote(voteType) {
   downvoteBtn.disabled = true;
   upvoteBtn.style.cursor = "not-allowed";
   downvoteBtn.style.cursor = "not-allowed";
-  // ------------------------------------------------------------------
 
   try {
-    // Check if record exists
     const { data: existing } = await supabaseClient
       .from("pokemon_votes")
       .select("*")
@@ -241,7 +294,6 @@ async function castVote(voteType) {
     const isUp = voteType === "upvote";
 
     if (!existing) {
-      // Insert new row
       const { error: insertError } = await supabaseClient
         .from("pokemon_votes")
         .insert([
@@ -255,7 +307,6 @@ async function castVote(voteType) {
 
       if (insertError) throw insertError;
     } else {
-      // Update existing row
       const { error: updateError } = await supabaseClient
         .from("pokemon_votes")
         .update({
@@ -271,14 +322,12 @@ async function castVote(voteType) {
     localStorage.setItem("user_voted_pokemon", JSON.stringify(votedIds));
     fetchVotes(pokemonId);
   } catch (err) {
-    // --- ADDED: Revert classes if the DB write fails ---
     upvoteBtn.classList.remove("selected-vote", "dimmed-vote");
     downvoteBtn.classList.remove("selected-vote", "dimmed-vote");
     upvoteBtn.disabled = false;
     downvoteBtn.disabled = false;
     upvoteBtn.style.cursor = "pointer";
     downvoteBtn.style.cursor = "pointer";
-    // ----------------------------------------------------
 
     console.error("Error submitting vote to Supabase:", err);
     alert("Could not save vote. Please try again!");
@@ -289,6 +338,18 @@ async function castVote(voteType) {
 async function spinSlotMachine() {
   drawBtn.disabled = true;
 
+  const votedIds = getVotedPokemonIds();
+
+  // Filter out voted IDs
+  const allIds = Array.from({ length: TOTAL_POKEMON }, (_, i) => i + 1);
+  const unvotedIds = allIds.filter((id) => !votedIds.includes(id));
+
+  if (unvotedIds.length === 0) {
+    alert("Congratulations! You have voted on every single Pokémon!");
+    drawBtn.disabled = false;
+    return;
+  }
+
   upvoteBtn.classList.remove("selected-vote", "dimmed-vote");
   downvoteBtn.classList.remove("selected-vote", "dimmed-vote");
   upvoteBtn.disabled = false;
@@ -296,9 +357,10 @@ async function spinSlotMachine() {
   upvoteBtn.style.cursor = "pointer";
   downvoteBtn.style.cursor = "pointer";
 
-  const targetId = Math.floor(Math.random() * TOTAL_POKEMON) + 1;
+  // Pick targetId from unvoted array
+  const randomIndex = Math.floor(Math.random() * unvotedIds.length);
+  const targetId = unvotedIds[randomIndex];
 
-  // 1. Start API requests immediately in background
   const speciesPromise = fetchData(
     `https://pokeapi.co/api/v2/pokemon-species/${targetId}`,
   );
@@ -306,12 +368,10 @@ async function spinSlotMachine() {
     `https://pokeapi.co/api/v2/pokemon/${targetId}`,
   );
 
-  // 2. Prepare UI for the Pokéball animation
   imgContainer.style.display = "flex";
   pokemonImg.style.display = "block";
   pokemonName.textContent = "Catching...";
 
-  // Reset previous animation classes
   pokemonImg.classList.remove("pokemon-burst");
   pokemonTypes.innerHTML = "";
   statsContainer.innerHTML = "";
@@ -321,25 +381,21 @@ async function spinSlotMachine() {
   varietySelect.style.display = "none";
   votingSection.style.display = "none";
 
-  // Set sprite to Pokéball and start bouncing/wobbling
   pokemonImg.src = POKEBALL_IMAGE_PATH;
   pokemonImg.classList.add("pokeball-anim");
 
-  // 3. Wait for API response + enforce a minimum 1.8s animation window
   const [_, speciesData, basePokemonData] = await Promise.all([
     new Promise((resolve) => setTimeout(resolve, 1800)),
     speciesPromise,
     basePokemonPromise,
   ]);
 
-  // Remove Pokéball animation
   pokemonImg.classList.remove("pokeball-anim");
 
   if (basePokemonData) {
     currentPokemonData = basePokemonData;
     currentSpeciesData = speciesData;
 
-    // Trigger burst/reveal animation on the actual Pokémon sprite
     pokemonImg.classList.add("pokemon-burst");
 
     setupVarietiesDropdown(speciesData);
@@ -414,7 +470,6 @@ function updatePokemonDisplay() {
     speed: "Speed",
   };
 
-  // Render Stats Bars
   statsContainer.innerHTML = currentPokemonData.stats
     .map((s) => {
       const name = statAbbreviations[s.stat.name] || s.stat.name;
