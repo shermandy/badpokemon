@@ -81,7 +81,10 @@ function setActiveTab(activeBtn, activeView) {
 }
 
 if (tabGenBtn) {
-  tabGenBtn.addEventListener("click", () => setActiveTab(tabGenBtn, genView));
+  tabGenBtn.addEventListener("click", () => {
+    setActiveTab(tabGenBtn, genView);
+    spinSlotMachine();
+  });
 }
 
 if (tabLeadBtn) {
