@@ -345,7 +345,8 @@ async function spinSlotMachine() {
   const unvotedIds = allIds.filter((id) => !votedIds.includes(id));
 
   if (unvotedIds.length === 0) {
-    alert("Congratulations! You have voted on every single Pokémon!");
+    pokemonName.textContent =
+      "You caught them all! No More Pokémon left to judge.";
     drawBtn.disabled = false;
     return;
   }
